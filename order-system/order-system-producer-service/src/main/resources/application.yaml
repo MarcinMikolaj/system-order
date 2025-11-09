@@ -1,0 +1,30 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: order-system-producer-service
+
+  kafka:
+
+    topic-name: order-events
+
+    bootstrap-servers:
+      - localhost:29092
+      - localhost:29093
+      - localhost:29094
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      retries: 5
+      properties:
+        acks: all
+        enable.idempotence: true
+        linger.ms: 10
+        batch.size: 32768
+
+    admin:
+      properties:
+        bootstrap.servers: localhost:29092,localhost:29093,localhost:29094
+

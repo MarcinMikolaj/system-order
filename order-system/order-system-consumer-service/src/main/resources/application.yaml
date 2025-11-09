@@ -1,0 +1,100 @@
+server:
+  port: 8082
+
+spring:
+
+  application:
+    name: order-system-consumer-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:order-system-db}
+    driver-class-name: org.postgresql.Driver
+    username: order-system-admin
+    password: order-system-admin
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    defer-datasource-initialization: true
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 500
+          batch_versioned_data: true
+          order_inserts: true
+          order_updates: true
+
+  kafka:
+
+    topic-name: order-events
+
+    bootstrap-servers:
+      - localhost:29092
+      - localhost:29093
+      - localhost:29094
+    consumer:
+      group-id: order-process-group
+      key-deserializer: org.apache.kafka.common.serialization.IntegerDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      properties:
+        max.poll.records: 200
+
+    listener:
+      ack-mode: manual
+      concurrency: 3
+
+  mail:
+    host: ${ORDER_SYSTEM_MAIL_HOST:localhost}
+    port: ${ORDER_SYSTEM_MAIL_PORT:1025}
+    username: ${ORDER_SYSTEM_USERNAME:username}
+    password: ${ORDER_SYSTEM_MAIL_PASSWORD:password}
+    properties:
+      mail:
+        smtp:
+          auth: false
+        starttls:
+          enable: ${ORDER_SYSTEM_MAIL_SSL:false}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      order-group-circuit-breaker:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 20
+        failureRateThreshold: 50           # otwórz CB, gdy >=50% z tych 50 to porażki
+        waitDurationInOpenState: 10s       # po otwarciu CB czekaj 10s zanim spróbujesz znów (half-open)
+        permittedNumberOfCallsInHalfOpenState: 5  # w half-open przepuść 5 prób testowych
+        recordExceptions:                  # tylko te wyjątki liczą się jako porażki
+          - org.springframework.dao.TransientDataAccessException
+          - org.springframework.transaction.TransactionTimedOutException
+          - org.hibernate.QueryTimeoutException
+
+#app:
+#  scheduler:
+#    default:
+#      group-identity: DEFAULT_GROUP
+#      misfire-policy: ${DEFAULT_JOB_MISFIRE_POLICY:DO_NOTHING}
+#      recovery: ${DEFAULT_JOB_RECOVERY:false}
+#      durable: ${DEFAULT_JOB_DURABLE:true}
+#    groups:
+#      order-process-group:
+#        identity: ORDER_PROCESS_GROUP
+#        jobs:
+#          order-notification-job:
+#            identity: ORDER_NOTIFICATION_JOB
+#            enabled: ${ORDER_NOTIFICATION_JOB_ENABLED:true}
+#            recovery: ${ORDER_NOTIFICATION_JOB_RECOVERY:true}
+#            durable: ${ORDER_NOTIFICATION_JOB_DURABLE:true}
+#            cron: ${ORDER_NOTIFICATION_JOB_CRON:0/5 * * * * ? *}
+#            misfire-policy: ${ORDER_NOTIFICATION_JOB_MISFIRE_POLICY:DO_NOTHING}
+#            description: ${ORDER_NOTIFICATION_JOB_JOB_DESCRIPTION:Process order and send notification}

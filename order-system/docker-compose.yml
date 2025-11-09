@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+
+  order-system-local-postgres:
+    image: postgres:15.14
+    container_name: order-system-local-postgres
+    environment:
+      POSTGRES_DB: order-system-db
+      POSTGRES_USER: order-system-admin
+      POSTGRES_PASSWORD: order-system-admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - order-system-local-postgres_volume:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U gpone-admin -d gpone-db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  order-system-local-zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: order-system-local-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  order-system-local-broker-1:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: order-system-local-broker-1
+    depends_on: [ order-system-local-zookeeper ]
+    ports:
+      - "9092:9092"     # wewnątrz sieci compose: broker-1:9092
+      - "29092:29092"   # z hosta: localhost:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: order-system-local-zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://order-system-local-broker-1:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  order-system-local-broker-2:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: order-system-local-broker-2
+    depends_on: [ order-system-local-zookeeper ]
+    ports:
+      - "9093:9092"
+      - "29093:29092"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: order-system-local-zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://order-system-local-broker-2:9092,PLAINTEXT_HOST://localhost:29093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  order-system-local-broker-3:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: order-system-local-broker-3
+    depends_on: [ order-system-local-zookeeper ]
+    ports:
+      - "9094:9092"
+      - "29094:29092"
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: order-system-local-zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://order-system-local-broker-3:9092,PLAINTEXT_HOST://localhost:29094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  order-system-local-kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: order-system-local-kafka-ui
+    depends_on:
+      - order-system-local-broker-1
+      - order-system-local-broker-2
+      - order-system-local-broker-3
+      - order-system-local-zookeeper
+    ports:
+      - "8085:8080"   # UI dostępne na http://localhost:8080
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-3b
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: order-system-local-broker-1:9092,order-system-local-broker-2:9092,order-system-local-broker-3:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: order-system-local-zookeeper:2181
+      # opcjonalnie:
+      KAFKA_CLUSTERS_0_READONLY: "false"
+      # jeżeli chcesz widzieć schematy/ksql (gdybyś dodał):
+      # KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      # KAFKA_CLUSTERS_0_KSQLDBSERVER: http://ksqldb:8088
+
+  order-system-local-mailpit:
+    image: axllent/mailpit
+    container_name: order-system-local-mailpit
+    restart: unless-stopped
+    volumes:
+      - order-system-local-mailpit_volume:/data
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_DATABASE: /data/mailpit.db
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+      MP_SMTP_AUTH_USERNAME: mailpit-username
+      MP_SMTP_AUTH_PASSWORD: mailpit-password
+      MP_ENABLE_CHAOS: false
+
+volumes:
+  order-system-local-postgres_volume:
+  order-system-local-mailpit_volume:

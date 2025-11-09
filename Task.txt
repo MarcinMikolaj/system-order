@@ -1,0 +1,4 @@
+- build base producer skeleton
+- build base consumer skeleton
+
+- Build simple producer/consumer and send kafka simple message base on domain

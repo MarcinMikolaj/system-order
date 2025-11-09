@@ -1,0 +1,58 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: order-system-smtp-service
+
+  kafka:
+
+    topic-name: order-events
+
+    bootstrap-servers:
+      - localhost:29092
+      - localhost:29093
+      - localhost:29094
+    consumer:
+      group-id: order-smtp-group
+      key-deserializer: org.apache.kafka.common.serialization.IntegerDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      properties:
+        max.poll.records: 200
+
+    listener:
+      ack-mode: manual
+      concurrency: 3
+
+  mail:
+    host: ${ORDER_SYSTEM_MAIL_HOST:localhost}
+    port: ${ORDER_SYSTEM_MAIL_PORT:1025}
+    username: ${ORDER_SYSTEM_USERNAME:username}
+    password: ${ORDER_SYSTEM_MAIL_PASSWORD:password}
+    properties:
+      mail:
+        smtp:
+          timeout: 3000
+          writetimeout: 3000
+          connectiontimeout: 10000
+          auth: false
+        starttls:
+          enable: ${ORDER_SYSTEM_MAIL_SSL:false}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      order-group-circuit-breaker:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 20
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+        recordExceptions:
+          - org.springframework.mail.MailSendException
+          - jakarta.mail.MessagingException
+          - java.net.SocketTimeoutException
+          - javax.net.ssl.SSLException
